@@ -366,7 +366,7 @@ def update_collector_mass_flow_rate(edited_radiator_df: pd.DataFrame, edited_col
     return updated_collector_df
 
 
-def calculate_kv_position_valve(merged_df):
+def calculate_kv_position_valve(merged_df, custom_kv_max=None, n=None):
     merged_df = merged_df.copy()
     merged_df['Total pressure valve circuit'] = merged_df['Total Pressure Loss'] + merged_df['Thermostatic valve pressure loss N']
     maximum_pressure = max(merged_df['Total pressure valve circuit'])
@@ -376,18 +376,34 @@ def calculate_kv_position_valve(merged_df):
     a = 0.0114
     b = - 0.0086
     c = 0.0446
-    merged_df['Valve position'] = calculate_valve_position(a, b, c, merged_df['kv_needed'])
+    initial_positions = calculate_valve_position(a, b, c, merged_df['kv_needed'])
+
+    if custom_kv_max is not None and n is not None:
+        kv_needed_array = merged_df['kv_needed'].to_numpy()
+        adjusted_positions = adjust_position_with_custom_values(custom_kv_max, n, kv_needed_array)
+        merged_df['Valve position'] = adjusted_positions.flatten()  # Ensure this is a single-dimensional array
+    else:
+        merged_df['Valve position'] = initial_positions.flatten()  # Ensure this is a single-dimensional array
+
     return merged_df
 
 
 def calculate_valve_position(a, b, c, kv_needed):
-
     discriminant = b ** 2 - 4 * a * (c - kv_needed)
     discriminant = np.where(discriminant < 0, 0, discriminant)
     root = -b + np.sqrt(discriminant) / (2 * a)
     root = np.where(discriminant < 0, 1, root)
     result = np.ceil(root)
     return result
+
+
+def adjust_position_with_custom_values(kv_max, n, kv_needed):
+    ratio_kv = kv_needed / 0.7054
+    adjusted_ratio_kv = (ratio_kv * kv_max) / kv_max
+    ratio_position = np.clip(np.sqrt(adjusted_ratio_kv), 0,1)
+    adjusted_position = np.ceil(ratio_position * n)
+    return adjusted_position
+
 
 
 def validate_data(df: pd.DataFrame) -> bool:

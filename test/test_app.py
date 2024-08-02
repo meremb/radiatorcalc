@@ -47,7 +47,6 @@ def sample_merged_df():
         'Radiator nr': [1, 2, 3],
         'Length circuit': [10.0, 12.0, 11.0],
         'Mass flow rate': [62.3346, 278.6284, 161.3589],
-        'kv needed': [0.13042, 0.013042, 0.7],
         'Thermostatic valve pressure loss N': [770.617, 15396.8443, 5163.7682],
         'Total Pressure Loss': [621.4229, 3416.6006, 1197.1213],
     }
@@ -216,6 +215,7 @@ def test_calculate_kv_position_valve(sample_merged_df):
 
 def test_calculate_valve_position(sample_merged_df):
     """Test if we get a valve position of 1 when discriminant is negative"""
+    sample_merged_df['kv needed'] = np.array([0.13042, 0.013042, 0.7])
     a = 0.0114
     b = - 0.0086
     c = 0.0446
@@ -223,3 +223,12 @@ def test_calculate_valve_position(sample_merged_df):
     position_valve_expected = np.array([3, 1, 8])
     assert np.array_equal(position_valve_calculated, position_valve_expected)
 
+
+def test_with_custom_thermostatic_valve(sample_merged_df):
+    custom_kv_max = 0.67
+    n = 9
+    merged_df_custom = calculate_kv_position_valve(sample_merged_df, custom_kv_max=custom_kv_max, n=n)
+    position_valve_expected_custom = np.array([5, 9, 7])  # Replace with expected values for custom test case
+    position_valve_calculated_custom = merged_df_custom['Valve position']
+    assert np.array_equal(position_valve_calculated_custom, position_valve_expected_custom), \
+        f"Expected {position_valve_expected_custom}, but got {position_valve_calculated_custom}"
