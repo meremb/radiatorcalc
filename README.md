@@ -1,4 +1,3 @@
-Sure! Below is a sample `README.md` for your project, based on the information you provided and the refactoring steps discussed.
 
 ---
 
