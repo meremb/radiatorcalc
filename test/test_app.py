@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import pytest
-from app import validate_data, calculate_pressure_loss_friction, calculate_c, calculate_Treturn, \
-    calculate_pressure_loss, calculate_mass_flow_rate, calculate_diameter, calculate_pressure_radiator_kv, \
-    update_collector_mass_flow_rate, merge_and_calculate_total_pressure_loss, calculate_pressure_collector_kv, \
-    calculate_pressure_valve_kv, calculate_valve_position, calculate_kv_position_valve
+from utils.helpers import calculate_pressure_loss, calculate_c, calculate_Treturn, calculate_mass_flow_rate, \
+    calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
+    calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
+    update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data
 
 
 @pytest.mark.parametrize(
