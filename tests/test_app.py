@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from utils.helpers import calculate_pressure_loss, calculate_c, calculate_Treturn, calculate_mass_flow_rate, \
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
     calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
@@ -245,6 +246,7 @@ def test_calculate_position_valve_with_ratio(sample_merged_df):
     position_valve_calculated = calculate_position_valve_with_ratio(kv_max=kv_max, n=n, kv_needed=kv_needed)
     position_valve_expected = np.array([3, 1, 8])
     assert np.array_equal(position_valve_calculated, position_valve_expected)
+    # now we use same kv as in previous test and we find better approximation for the positions of the valve
     kv_max = 0.67
     n = 9
     kv_needed = np.array([0.14615, 0.71008, 0.38445])
