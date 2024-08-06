@@ -19,6 +19,8 @@ def main() -> None:
     st.sidebar.header('Configuration')
     num_radiators = st.sidebar.number_input('Number of Radiators', min_value=1, value=3, step=1)
     num_collectors = st.sidebar.number_input('Number of Collectors', min_value=1, value=1, step=1)
+    positions = st.sidebar.number_input('Number of positions for valve', min_value=1, value=8, step=1)
+    kv_max = st.sidebar.number_input('kv max for the valve', min_value=0.50, value=0.70, step=0.01)
 
     # Add slider for delta T input
     delta_T = st.sidebar.slider('Delta T (°C)', min_value=3, max_value=20, value=5, step=1)
@@ -178,7 +180,7 @@ def main() -> None:
                 axis=1
             )
             # calculate the thermostatic valve position
-            merged_df = calculate_kv_position_valve(merged_df=merged_df)
+            merged_df = calculate_kv_position_valve(merged_df=merged_df, n=positions, custom_kv_max=kv_max)
 
             # Group by 'Radiator' and calculate total pressure loss per circuit
             total_pressure_loss_per_circuit: pd.DataFrame = (
