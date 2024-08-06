@@ -4,7 +4,8 @@ import pytest
 from utils.helpers import calculate_pressure_loss, calculate_c, calculate_Treturn, calculate_mass_flow_rate, \
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
     calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
-    update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data
+    update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data, \
+    calculate_position_valve_with_ratio
 
 
 @pytest.mark.parametrize(
@@ -220,6 +221,8 @@ def test_calculate_valve_position(sample_merged_df):
     b = - 0.0086
     c = 0.0446
     position_valve_calculated = calculate_valve_position(a, b, c, sample_merged_df['kv needed'])
+    # we still need to ceil the results
+    position_valve_calculated = np.ceil(position_valve_calculated)
     position_valve_expected = np.array([3, 1, 8])
     assert np.array_equal(position_valve_calculated, position_valve_expected)
 
@@ -228,7 +231,26 @@ def test_with_custom_thermostatic_valve(sample_merged_df):
     custom_kv_max = 0.67
     n = 9
     merged_df_custom = calculate_kv_position_valve(sample_merged_df, custom_kv_max=custom_kv_max, n=n)
-    position_valve_expected_custom = np.array([5, 9, 7])  # Replace with expected values for custom test case
+    position_valve_expected_custom = np.array([5, 9, 7])  # Replace with expected values for custom tests case
     position_valve_calculated_custom = merged_df_custom['Valve position']
     assert np.array_equal(position_valve_calculated_custom, position_valve_expected_custom), \
         f"Expected {position_valve_expected_custom}, but got {position_valve_calculated_custom}"
+
+
+def test_calculate_position_valve_with_ratio(sample_merged_df):
+    # first with original kv_max and n positions
+    kv_max = 0.7054
+    n = 8
+    kv_needed = np.array([0.13042, 0.013042, 0.7])
+    position_valve_calculated = calculate_position_valve_with_ratio(kv_max=kv_max, n=n, kv_needed=kv_needed)
+    position_valve_expected = np.array([3, 1, 8])
+    assert np.array_equal(position_valve_calculated, position_valve_expected)
+    kv_max = 0.67
+    n = 9
+    kv_needed = np.array([0.14615, 0.71008, 0.38445])
+    position_valve_calculated = calculate_position_valve_with_ratio(kv_max=kv_max, n=n, kv_needed=kv_needed)
+    position_valve_expected = np.array([4, 9, 7])
+    assert np.array_equal(position_valve_calculated, position_valve_expected), \
+        f"Expected {position_valve_expected}, but got {position_valve_calculated}"
+
+
