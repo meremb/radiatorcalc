@@ -144,11 +144,8 @@ def main() -> None:
 
             # Calculate pressure loss for each row
             edited_radiator_df['Pressure loss'] = edited_radiator_df.apply(
-                lambda row: calculate_pressure_radiator_kv(
-                    row['Length circuit'],
-                    row['Diameter'],
-                    row['Mass flow rate']
-                ),
+                lambda row: calculate_pressure_radiator_kv(row['Length circuit'], row['Diameter'],
+                                                           row['Mass flow rate']),
                 axis=1
             )
 

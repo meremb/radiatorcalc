@@ -20,19 +20,20 @@ def calculate_pressure_loss(
     return pressure_loss
 
 
-def calculate_c(Q_ratio: float, delta_T: float) -> float:
+def calculate_c(q_ratio: float, delta_t: float) -> float:
     """Calculate the constant 'c' based on Q_ratio and delta_T."""
-    c = math.exp(delta_T / T_FACTOR / Q_ratio**(1 / EXPONENT_RADIATOR))
+    c = math.exp(delta_t / T_FACTOR / q_ratio ** (1 / EXPONENT_RADIATOR))
     return c
 
 
-def calculate_Tsupply(space_temperature: float, constant_c: float, delta_T: float) -> float:
+def calculate_Tsupply(space_temperature: float, constant_c: float, delta_t: float) -> float:
     """Calculate the supply temperature based on space temperature, constant_c, and delta_T."""
-    return space_temperature + (constant_c / (constant_c - 1)) * delta_T
+    return space_temperature + (constant_c / (constant_c - 1)) * delta_t
 
 
-def calculate_Treturn(Q_ratio: float, space_temperature: float, max_supply_temperature: float) -> float:
-    return ((Q_ratio**(1/EXPONENT_RADIATOR)*T_FACTOR)**2)/(max_supply_temperature-space_temperature)+space_temperature
+def calculate_Treturn(q_ratio: float, space_temperature: float, max_supply_temperature: float) -> float:
+    return (((q_ratio ** (1 / EXPONENT_RADIATOR) * T_FACTOR) ** 2)/(max_supply_temperature - space_temperature) +
+            space_temperature)
 
 
 def calculate_mass_flow_rate(supply_temperature: float, return_temperature:float, heat_loss:float) -> float:
@@ -107,9 +108,9 @@ def calculate_pressure_loss_friction(
     return delta_p
 
 
-def calculate_pressure_radiator_kv(length_cicuit: float, diameter: float, mass_flow_rate: float) -> float:
+def calculate_pressure_radiator_kv(length_circuit: float, diameter: float, mass_flow_rate: float) -> float:
     """Using simplified functions for the kv of a component the pressure loss for the circuit is calculated. """
-    pressure_loss_piping = calculate_pressure_loss_piping(diameter, length_cicuit, mass_flow_rate)
+    pressure_loss_piping = calculate_pressure_loss_piping(diameter, length_circuit, mass_flow_rate)
     kv_radiator = 2
     pressure_loss_radiator = 97180*(mass_flow_rate/1000/kv_radiator)**2
     return pressure_loss_piping + pressure_loss_radiator
