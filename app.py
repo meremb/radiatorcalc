@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from typing import List, Dict
 
-from utils.helpers import possible_diameters, calculate_c, calculate_Tsupply, calculate_Treturn, calculate_mass_flow_rate, \
+from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_Tsupply, calculate_Treturn, calculate_mass_flow_rate, \
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_radiator_kv, \
     calculate_pressure_collector_kv, calculate_pressure_valve_kv, update_collector_mass_flow_rate, \
     calculate_kv_position_valve, validate_data
@@ -137,7 +137,7 @@ def main() -> None:
             )
 
             edited_radiator_df['Diameter'] = edited_radiator_df.apply(
-                lambda row: calculate_diameter(row['Mass flow rate'], possible_diameters),
+                lambda row: calculate_diameter(row['Mass flow rate'], POSSIBLE_DIAMETERS),
                 axis=1
             )
             edited_radiator_df['Diameter'] = edited_radiator_df['Diameter'].max()
@@ -156,7 +156,7 @@ def main() -> None:
             edited_collector_df = update_collector_mass_flow_rate(edited_radiator_df, edited_collector_df)
 
             edited_collector_df['Diameter'] = edited_collector_df.apply(
-                lambda row: calculate_diameter(row['Mass flow rate'], possible_diameters),
+                lambda row: calculate_diameter(row['Mass flow rate'], POSSIBLE_DIAMETERS),
                 axis=1
             )
             edited_collector_df['Diameter'] = edited_collector_df['Diameter'].max()

@@ -6,7 +6,7 @@ from utils.helpers import calculate_pressure_loss, calculate_c, calculate_Tretur
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
     calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
     update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data, \
-    calculate_position_valve_with_ratio
+    calculate_position_valve_with_ratio, POSSIBLE_DIAMETERS
 
 
 @pytest.mark.parametrize(
@@ -124,15 +124,14 @@ def test_calculate_mass_flow_rate():
 def test_calculate_diameter():
     mass_flow_rate = 331
     diameter_expected = 20
-    possible_diameters = [8, 10, 12, 13, 14, 16, 20, 26]
-    diameter_calculated = calculate_diameter(mass_flow_rate, possible_diameters)
+    diameter_calculated = calculate_diameter(mass_flow_rate, POSSIBLE_DIAMETERS)
     assert pytest.approx(diameter_expected, rel=1e-2) == diameter_calculated
     mass_flow_rate = 5000
     with pytest.raises(ValueError, match="Calculated diameter exceeds the maximum allowable diameter for mass flow rate:5000"):
-        calculate_diameter(mass_flow_rate, possible_diameters)
+        calculate_diameter(mass_flow_rate, POSSIBLE_DIAMETERS)
     mass_flow_rate = np.nan
     with pytest.raises(ValueError, match="The mass flow rate cannot be NaN check the configuration of the number of collectors."):
-        calculate_diameter(mass_flow_rate, possible_diameters)
+        calculate_diameter(mass_flow_rate, POSSIBLE_DIAMETERS)
 
 
 

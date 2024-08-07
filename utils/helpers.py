@@ -4,8 +4,9 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-possible_diameters = [8, 10, 12, 13, 14, 16, 20, 22, 28, 36]
-
+POSSIBLE_DIAMETERS = [8, 10, 12, 13, 14, 16, 20, 22, 28, 36]
+T_FACTOR = 49.83
+EXPONENT_RADIATOR = 1.34
 
 def calculate_pressure_loss(
         power: float, mass_flow_rate: float, diameter: float,
@@ -21,9 +22,7 @@ def calculate_pressure_loss(
 
 def calculate_c(Q_ratio: float, delta_T: float) -> float:
     """Calculate the constant 'c' based on Q_ratio and delta_T."""
-    T_factor = 49.83
-    exponent_radiator = 1.34
-    c = math.exp(delta_T / T_factor / Q_ratio**(1 / exponent_radiator))
+    c = math.exp(delta_T / T_FACTOR / Q_ratio**(1 / EXPONENT_RADIATOR))
     return c
 
 
@@ -33,9 +32,7 @@ def calculate_Tsupply(space_temperature: float, constant_c: float, delta_T: floa
 
 
 def calculate_Treturn(Q_ratio: float, space_temperature: float, max_supply_temperature: float) -> float:
-    T_factor = 49.83
-    exponent_radiator = 1.34
-    return ((Q_ratio**(1/exponent_radiator)*T_factor)**2)/(max_supply_temperature-space_temperature)+space_temperature
+    return ((Q_ratio**(1/EXPONENT_RADIATOR)*T_FACTOR)**2)/(max_supply_temperature-space_temperature)+space_temperature
 
 
 def calculate_mass_flow_rate(supply_temperature: float, return_temperature:float, heat_loss:float) -> float:
