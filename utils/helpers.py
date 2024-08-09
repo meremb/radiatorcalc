@@ -223,3 +223,7 @@ def validate_data(df: pd.DataFrame) -> bool:
     return True
 
 
+def calculate_water_volume():
+    pass
+
+
