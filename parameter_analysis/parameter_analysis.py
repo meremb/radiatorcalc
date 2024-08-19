@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_Tsupply, calculate_Treturn, calculate_mass_flow_rate, \
+from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_tsupply, calculate_treturn, calculate_mass_flow_rate, \
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_radiator_kv, \
     calculate_pressure_collector_kv, calculate_pressure_valve_kv, update_collector_mass_flow_rate, \
     calculate_kv_position_valve, validate_data
@@ -84,7 +84,7 @@ for num_radiators in num_radiators_list:
 
                     # Calculate supply temperature for each radiator
                     radiator_data['Supply Temperature'] = radiator_data.apply(
-                        lambda row: calculate_Tsupply(row['Space Temperature'], row['Constant_c'], delta_T),
+                        lambda row: calculate_tsupply(row['Space Temperature'], row['Constant_c'], delta_T),
                         axis=1
                     )
 
@@ -92,7 +92,7 @@ for num_radiators in num_radiators_list:
                     max_supply_temperature = radiator_data['Supply Temperature'].max()
 
                     radiator_data['Return Temperature'] = radiator_data.apply(
-                        lambda row: calculate_Treturn(row['Q_ratio'], row['Space Temperature'], max_supply_temperature),
+                        lambda row: calculate_treturn(row['Q_ratio'], row['Space Temperature'], max_supply_temperature),
                         axis=1
                     )
 
