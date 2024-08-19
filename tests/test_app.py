@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from utils.helpers import calculate_pressure_loss, calculate_c, calculate_Treturn, calculate_mass_flow_rate, \
+from utils.helpers import calculate_pressure_loss, calculate_c, calculate_treturn, calculate_mass_flow_rate, \
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
     calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
     update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data, \
@@ -109,7 +109,7 @@ def test_return():
     space_temperature = 20
     max_supply = 63
     T_return_expected = 38.12
-    T_return_calculated = calculate_Treturn(Q_ratio,space_temperature, max_supply)
+    T_return_calculated = calculate_treturn(Q_ratio, space_temperature, max_supply)
     assert pytest.approx(T_return_expected, rel=1e-3) == T_return_calculated
 
 

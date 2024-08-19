@@ -26,12 +26,12 @@ def calculate_c(q_ratio: float, delta_t: float) -> float:
     return c
 
 
-def calculate_Tsupply(space_temperature: float, constant_c: float, delta_t: float) -> float:
+def calculate_tsupply(space_temperature: float, constant_c: float, delta_t: float) -> float:
     """Calculate the supply temperature based on space temperature, constant_c, and delta_T."""
     return space_temperature + (constant_c / (constant_c - 1)) * delta_t
 
 
-def calculate_Treturn(q_ratio: float, space_temperature: float, max_supply_temperature: float) -> float:
+def calculate_treturn(q_ratio: float, space_temperature: float, max_supply_temperature: float) -> float:
     return (((q_ratio ** (1 / EXPONENT_RADIATOR) * T_FACTOR) ** 2)/(max_supply_temperature - space_temperature) +
             space_temperature)
 
