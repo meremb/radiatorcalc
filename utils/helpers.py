@@ -223,7 +223,8 @@ def validate_data(df: pd.DataFrame) -> bool:
     return True
 
 
-def calculate_water_volume():
-    pass
+def calculate_water_volume(diameter: float, length_circuit: float) -> float:
+    water_volume_pipe = (np.pi * (diameter/2)**2)/1000000 * length_circuit * 1000
+    return water_volume_pipe
 
 

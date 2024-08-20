@@ -6,7 +6,7 @@ from utils.helpers import calculate_pressure_loss, calculate_c, calculate_tretur
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
     calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
     update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data, \
-    calculate_position_valve_with_ratio, POSSIBLE_DIAMETERS
+    calculate_position_valve_with_ratio, POSSIBLE_DIAMETERS, calculate_water_volume
 
 
 @pytest.mark.parametrize(
@@ -254,4 +254,11 @@ def test_calculate_position_valve_with_ratio(sample_merged_df):
     assert np.array_equal(position_valve_calculated, position_valve_expected), \
         f"Expected {position_valve_expected}, but got {position_valve_calculated}"
 
+
+def test_calculate_water_volume():
+    diameter = 16
+    circuit_length = 16
+    water_pipe_volume_calculated = calculate_water_volume(diameter=diameter, length_circuit=circuit_length)
+    water_pipe_volume_measured = 3.21
+    assert pytest.approx(water_pipe_volume_measured, rel=1e-2) == water_pipe_volume_calculated
 
