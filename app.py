@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 from typing import List, Dict
 
-from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_tsupply, calculate_treturn, calculate_mass_flow_rate, \
+from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_tsupply, calculate_treturn, \
+    calculate_mass_flow_rate, \
     calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_radiator_kv, \
     calculate_pressure_collector_kv, calculate_pressure_valve_kv, update_collector_mass_flow_rate, \
-    calculate_kv_position_valve, validate_data
+    calculate_kv_position_valve, validate_data, calculate_water_volume
 from utils.plotting import plot_pressure_loss, plot_thermostatic_valve_position, plot_mass_flow_distribution, \
     plot_temperature_heatmap
 
@@ -185,8 +186,31 @@ def main() -> None:
                 .sum().reset_index()
             )
 
-            # Display results
+            # Calculate water volume for each radiator's piping
+            edited_radiator_df['Water Volume (Pipe)'] = edited_radiator_df.apply(
+                lambda row: calculate_water_volume(row['Diameter'],
+                                                   row['Length circuit']),
+                axis=1
+            )
+            # Calculate water volume for each radiator's piping
+            edited_collector_df['Water Volume (Pipe)'] = edited_collector_df.apply(
+                lambda row: calculate_water_volume(row['Diameter'],
+                                                   row['Collector circuit length']),
+                axis=1
+            )
+
+            # Add 7 liters for each radiator to the total water volume
+            edited_radiator_df['Total Water Volume'] = edited_radiator_df['Water Volume (Pipe)'] + 7
+
+            # Calculate the total water volume across all radiators
+            total_water_volume = (edited_radiator_df['Total Water Volume'].sum() +
+                                  edited_collector_df['Water Volume (Pipe)'].sum())
+
+            # Display the total water volume
             st.write('### Results')
+            st.write(f"**Total Water Volume across heating system:** {total_water_volume:.2f} liters")
+
+            # Display results
             st.write('**Individual Radiator Pressure Loss, Supply Temperature, and Return Temperature**')
             st.dataframe(
                 merged_df[['Radiator nr', 'Collector', 'Pressure loss', 'Total Pressure Loss',
@@ -196,7 +220,6 @@ def main() -> None:
             )
 
             # Display results
-            st.write('### Results')
             st.write('**Individual Collector results**')
             st.dataframe(
                 edited_collector_df[['Collector', 'Collector pressure loss', 'Mass flow rate', 'Diameter']],
