@@ -1,23 +1,13 @@
 import math
-from typing import List
-
 import numpy as np
 import pandas as pd
+
+from typing import List
+
 
 POSSIBLE_DIAMETERS = [8, 10, 12, 13, 14, 16, 20, 22, 28, 36]
 T_FACTOR = 49.83
 EXPONENT_RADIATOR = 1.34
-
-def calculate_pressure_loss(
-        power: float, mass_flow_rate: float, diameter: float,
-        length_supply: float, length_return: float) -> float:
-    """Calculate the pressure loss based on the given parameters."""
-    if diameter > 0 and (length_supply + length_return) > 0:
-        pressure_loss: float = (
-            power * mass_flow_rate / (diameter * (length_supply + length_return)))
-    else:
-        pressure_loss = 0
-    return pressure_loss
 
 
 def calculate_c(q_ratio: float, delta_t: float) -> float:
@@ -56,13 +46,6 @@ def merge_and_calculate_total_pressure_loss(edited_radiator_df: pd.DataFrame, ed
         pd.DataFrame):
     """
     Merge radiator DataFrame with collector DataFrame on 'Collector' column and calculate total pressure loss.
-
-    Parameters:
-    - radiator_df (pd.DataFrame): DataFrame containing radiator data with a 'Collector' column and 'Pressure Loss'.
-    - collector_df (pd.DataFrame): DataFrame containing collector data with a 'Collector' column and 'Collector Pressure Loss'.
-
-    Returns:
-    - pd.DataFrame: Updated DataFrame with total pressure loss.
     """
     merged_df = pd.merge(edited_radiator_df, edited_collector_df[['Collector', 'Collector pressure loss']],
                          on='Collector',
@@ -70,42 +53,6 @@ def merge_and_calculate_total_pressure_loss(edited_radiator_df: pd.DataFrame, ed
     # Calculate total pressure loss by adding existing Pressure Loss and Collector Pressure Loss
     merged_df['Total Pressure Loss'] = merged_df['Pressure loss'] + merged_df['Collector pressure loss']
     return merged_df
-
-
-def calculate_pressure_loss_friction(
-        length_supply: float, diameter: float, mass_flow_rate: float, rho=977.7, mu=0.414) -> float:
-    """
-    Calculate pressure loss in a tube based on friction (Darcy-Weisbach equation).
-
-    Parameters:
-    - length: Length of the tube (m)
-    - diameter: Inner diameter of the installed tube (mm)
-    - mass_flow_rate: Mass flow rate of the fluid (kg/h)
-    - rho: Density of the fluid (kg/m³), default: 977.7 (for water at 25°C)
-    - mu: Dynamic viscosity of the fluid (Pa·s or N·s/m²), default: 0.414 (for water at 25°C)
-
-    Returns:
-    - Pressure loss (Pa)
-    """
-    mass_flow_rate_seconds = mass_flow_rate / rho / 3600
-    area_tube = diameter**2 * np.pi / 4 / 1000000
-    velocity = mass_flow_rate_seconds / area_tube
-
-    # Calculate Reynolds number
-    Re = rho * velocity * diameter / mu
-
-    # Calculate friction factor (f)
-    if Re < 2000:
-        f = 64 / Re
-    else:
-        # For turbulent flow, use empirical correlation or data
-        # Example: f = 0.316 / Re**0.25 (for smooth pipes)
-        f = 0.316 / Re**0.25
-
-    # Calculate pressure loss using Darcy-Weisbach equation
-    delta_p = f * (length_supply / diameter) * (rho * velocity**2 / 2) * 1000
-
-    return delta_p
 
 
 def calculate_pressure_radiator_kv(length_circuit: float, diameter: float, mass_flow_rate: float) -> float:
@@ -123,13 +70,6 @@ def calculate_pressure_collector_kv(length_circuit: float, diameter: float, mass
     pressure_loss_boiler = 200
     pressure_loss_collector = 97180*(mass_flow_rate/1000/kv_collector)**2
     return pressure_loss_piping + pressure_loss_collector + pressure_loss_boiler
-
-
-def calculate_pressure_valve_kv(mass_flow_rate: float) -> float:
-    """Calculate pressure loss for thermostatic valve at position N. """
-    kv_max_valve_n = 0.7
-    pressure_loss_valve = 97180*(mass_flow_rate/1000/kv_max_valve_n)**2
-    return pressure_loss_valve
 
 
 def calculate_pressure_loss_piping(diameter: float, length_circuit: float, mass_flow_rate: float) -> float:
@@ -156,6 +96,13 @@ def update_collector_mass_flow_rate(edited_radiator_df: pd.DataFrame, edited_col
     # Merge the mass flow rates into the collector DataFrame
     updated_collector_df = pd.merge(edited_collector_df, collector_mass_flow_rate, on='Collector', how='left')
     return updated_collector_df
+
+
+def calculate_pressure_valve_kv(mass_flow_rate: float) -> float:
+    """Calculate pressure loss for thermostatic valve at position N. """
+    kv_max_valve_n = 0.7
+    pressure_loss_valve = 97180*(mass_flow_rate/1000/kv_max_valve_n)**2
+    return pressure_loss_valve
 
 
 def calculate_kv_position_valve(merged_df, custom_kv_max=None, n=None):

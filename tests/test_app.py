@@ -2,34 +2,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from utils.helpers import calculate_pressure_loss, calculate_c, calculate_treturn, calculate_mass_flow_rate, \
-    calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_loss_friction, \
+from utils.helpers import calculate_c, calculate_treturn, calculate_mass_flow_rate, \
+    calculate_diameter, merge_and_calculate_total_pressure_loss, \
     calculate_pressure_radiator_kv, calculate_pressure_collector_kv, calculate_pressure_valve_kv, \
     update_collector_mass_flow_rate, calculate_kv_position_valve, calculate_valve_position, validate_data, \
-    calculate_position_valve_with_ratio, POSSIBLE_DIAMETERS, calculate_water_volume
+    calculate_position_valve_with_ratio, POSSIBLE_DIAMETERS, calculate_water_volume, calculate_tsupply, \
+    calculate_pressure_loss_piping
 
-
-@pytest.mark.parametrize(
-    "power, mass_flow_rate, diameter, length_supply, length_return, expected",
-    [
-        (100.0, 0.1, 0.02, 10.0, 10.0, 25.0),  # Simple case
-        (0.0, 0.1, 0.02, 10.0, 10.0, 0.0),     # Zero power
-        (100.0, 0.0, 0.02, 10.0, 10.0, 0.0),   # Zero mass flow rate
-        (100.0, 0.1, 0.0, 10.0, 10.0, 0.0),    # Zero diameter
-        (100.0, 0.1, 0.02, 0.0, 0.0, 0.0),     # Zero length supply and return
-        (100.0, 0.1, 0.02, 10.0, 0.0, 50.0),   # Zero length return
-        (100.0, 0.1, 0.02, 0.0, 10.0, 50.0),   # Zero length supply
-    ]
-)
-def test_calculate_pressure_loss(
-    power: float, mass_flow_rate: float, diameter: float,
-    length_supply: float, length_return: float, expected: float
-) -> None:
-    """Test the calculate_pressure_loss function."""
-    result = calculate_pressure_loss(power, mass_flow_rate, diameter, length_supply, length_return)
-    assert result == pytest.approx(expected, rel=1e-2), (
-        f"Expected {expected}, got {result}"
-    )
 
 @pytest.fixture
 def sample_dataframe():
@@ -84,23 +63,13 @@ def test_validate_data_non_positive_values():
     assert validate_data(df) is False
 
 
-@pytest.mark.parametrize('length_supply, diameter, mass_flow_rate, rho, mu, expected_loss', [
-    (10.0, 8, 50.0, 1000.0, 0.4, 1750),   # Expected loss for first row
-    (15.0, 12, 120.5, 1100.0, 0.5, 1713),  # Expected loss for second row
-    (20.0, 16, 300.0, 1200.0, 0.414, 2513)   # Expected loss for third row
-])
-def test_calculate_pressure_loss_from_dataframe(length_supply, diameter, mass_flow_rate, rho, mu, expected_loss):
-    """Test calculate_pressure_loss_friction using values from sample_dataframe."""
-    pressure_loss = calculate_pressure_loss_friction(length_supply, diameter, mass_flow_rate, rho, mu)
-    assert pytest.approx(pressure_loss, rel=1e-3) == expected_loss
-
 def test_supply():
     Q_ratio = 0.65
     delta_T = 5
     space_temperature = 24
     constant_c = calculate_c(Q_ratio,delta_T)
     T_supply_expected = 62.68
-    T_supply_calculated = space_temperature + (constant_c/(constant_c-1))*delta_T
+    T_supply_calculated = calculate_tsupply(space_temperature, constant_c, delta_T)
     assert pytest.approx(T_supply_expected, rel=1e-3) == T_supply_calculated
 
 
@@ -134,6 +103,15 @@ def test_calculate_diameter():
         calculate_diameter(mass_flow_rate, POSSIBLE_DIAMETERS)
 
 
+def test_calculate_pressure_loss_piping():
+    length_circuit = 8
+    mass_flow_rate = 248
+    diameter = 14
+    pressure_loss_calculated = calculate_pressure_loss_piping(
+        length_circuit=length_circuit, mass_flow_rate=mass_flow_rate, diameter=diameter
+                                                              )
+    assert pytest.approx(pressure_loss_calculated, rel=1e-2) == 1829.26
+
 
 
 def test_calculate_pressure_loss_radiator_kv():
@@ -146,10 +124,10 @@ def test_calculate_pressure_loss_radiator_kv():
 
 
 def test_calculate_pressure_loss_collector_kv():
-    length_circuit = 6
-    mass_flow_rate = 287
-    diameter = 16
-    pressure_loss_expected = 953+40+200
+    length_circuit = 8
+    mass_flow_rate = 248
+    diameter = 14
+    pressure_loss_expected = 2057.07
     pressure_loss_calculated = calculate_pressure_collector_kv(length_circuit, diameter,mass_flow_rate)
     assert pytest.approx(pressure_loss_expected, rel=1e-2) == pressure_loss_calculated
 
@@ -256,9 +234,25 @@ def test_calculate_position_valve_with_ratio(sample_merged_df):
 
 
 def test_calculate_water_volume():
-    diameter = 16
-    circuit_length = 16
+    diameter = 14
+    circuit_length = 8
     water_pipe_volume_calculated = calculate_water_volume(diameter=diameter, length_circuit=circuit_length)
-    water_pipe_volume_measured = 3.21
+    water_pipe_volume_measured = 1.23
     assert pytest.approx(water_pipe_volume_measured, rel=1e-2) == water_pipe_volume_calculated
 
+
+
+# Sample data for testing
+radiator_data = pd.DataFrame({
+    'Radiator nr': [1, 2, 3],
+    'Collector': ['Collector 1', 'Collector 1', 'Collector 2'],
+    'Radiator power': [1500, 1500, 1500],
+    'Calculated heat loss': [1000, 1000, 1000],
+    'Length circuit': [10, 5, 7],
+    'Space Temperature': [20, 20, 20]
+})
+
+collector_data = pd.DataFrame({
+    'Collector': ['Collector 1', 'Collector 2'],
+    'Collector circuit length': [5, 5],
+})
