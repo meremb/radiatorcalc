@@ -10,8 +10,8 @@ from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_tsupply, ca
     calculate_kv_position_valve, validate_data
 
 # Define the parameter ranges
-num_radiators_list = [3, 5, 7]  # Example values
-num_collectors_list = [1, 2]  # Example values
+num_radiators_list = [3, 5, 7, 10]  # Example values
+num_collectors_list = [1, 2, 3]  # Example values
 heat_loss_ratios = np.linspace(0.2, 0.8, 13)  # Varying the ratio heat_loss to radiator power
 circuit_lengths = [5, 10, 20]  # Example circuit lengths
 space_temperatures = [16, 20, 24]  # Space Temperatures to be randomly assigned
@@ -328,17 +328,18 @@ def plot_surface_plots(results_df):
 
 
 def plot_facet_grids(results_df):
-    fig = px.scatter(results_df, x='Heat Loss Ratio', y='Diameter', color='Circuit Length',
+    results_df['Circuit Length'] = results_df['Circuit Length'].astype(str)
+    fig1 = px.scatter(results_df, x='Heat Loss Ratio', y='Diameter', color='Circuit Length',
                      facet_col='Number of Radiators', facet_row='Number of Collectors',
                      title='Diameter vs Heat Loss Ratio (Faceted by Radiators and Collectors)',
                      labels={'Diameter': 'Diameter (mm)'})
-    fig.show()
+    fig1.show()
 
-    fig = px.scatter(results_df, x='Heat Loss Ratio', y='Pressure Loss', color='Circuit Length',
+    fig2 = px.scatter(results_df, x='Heat Loss Ratio', y='Pressure Loss', color='Circuit Length',
                      facet_col='Number of Radiators', facet_row='Number of Collectors',
                      title='Pressure Loss vs Heat Loss Ratio (Faceted by Radiators and Collectors)',
                      labels={'Pressure Loss': 'Pressure Loss (Pa)'})
-    fig.show()
+    fig2.show()
 
 
 def main():
@@ -346,6 +347,7 @@ def main():
     plot_parallel_coordinates_overview(results)
     plot_surface_plots(results_df)
     plot_facet_grids(results_df)
+
 
 if __name__ == "__main__":
     main()
