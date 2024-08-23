@@ -8,6 +8,7 @@ from typing import List
 POSSIBLE_DIAMETERS = [8, 10, 12, 13, 14, 16, 20, 22, 28, 36]
 T_FACTOR = 49.83
 EXPONENT_RADIATOR = 1.34
+PRESSURE_LOSS_BOILER = 350
 
 
 def calculate_c(q_ratio: float, delta_t: float) -> float:
@@ -42,16 +43,30 @@ def calculate_diameter(mass_flow_rate: float, possible_diameters: List[int]) -> 
     return nearest_diameter
 
 
-def merge_and_calculate_total_pressure_loss(edited_radiator_df: pd.DataFrame, edited_collector_df: pd.DataFrame) -> (
-        pd.DataFrame):
+def merge_and_calculate_total_pressure_loss(edited_radiator_df: pd.DataFrame,
+                                            edited_collector_df: pd.DataFrame) -> pd.DataFrame:
     """
     Merge radiator DataFrame with collector DataFrame on 'Collector' column and calculate total pressure loss.
+
+    For radiators connected to Collector 1, add pressure losses from all subsequent collectors (2, 3, etc.).
+    For radiators connected to Collector 2, add pressure losses from subsequent collectors (3, etc.).
+    For radiators connected to the last collector, only add the pressure loss of its own collector.
     """
+    edited_collector_df = edited_collector_df.sort_values('Collector')
     merged_df = pd.merge(edited_radiator_df, edited_collector_df[['Collector', 'Collector pressure loss']],
-                         on='Collector',
-                         how='left')
-    # Calculate total pressure loss by adding existing Pressure Loss and Collector Pressure Loss
-    merged_df['Total Pressure Loss'] = merged_df['Pressure loss'] + merged_df['Collector pressure loss']
+                         on='Collector', how='left')
+    collector_pressure_loss_map = edited_collector_df.set_index('Collector')['Collector pressure loss'].to_dict()
+    collectors = list(collector_pressure_loss_map.keys())
+    total_pressure_losses = []
+    for idx, row in merged_df.iterrows():
+        current_collector_index = collectors.index(row['Collector'])
+        additional_pressure_loss = sum(
+            collector_pressure_loss_map[collectors[i]] for i in range(current_collector_index, len(collectors)))
+        total_pressure_loss = row['Pressure loss'] + additional_pressure_loss + PRESSURE_LOSS_BOILER
+        total_pressure_losses.append(total_pressure_loss)
+
+    merged_df['Total Pressure Loss'] = total_pressure_losses
+
     return merged_df
 
 
@@ -66,10 +81,9 @@ def calculate_pressure_radiator_kv(length_circuit: float, diameter: float, mass_
 def calculate_pressure_collector_kv(length_circuit: float, diameter: float, mass_flow_rate: float) -> float:
     """Using simplified functions for the kv of a component the pressure loss for the head circuit is calculated. """
     pressure_loss_piping = calculate_pressure_loss_piping(diameter, length_circuit, mass_flow_rate)
-    kv_collector = 14.66
-    pressure_loss_boiler = 200
+    kv_collector = 14.14
     pressure_loss_collector = 97180*(mass_flow_rate/1000/kv_collector)**2
-    return pressure_loss_piping + pressure_loss_collector + pressure_loss_boiler
+    return pressure_loss_piping + pressure_loss_collector
 
 
 def calculate_pressure_loss_piping(diameter: float, length_circuit: float, mass_flow_rate: float) -> float:

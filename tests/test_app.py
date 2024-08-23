@@ -124,10 +124,10 @@ def test_calculate_pressure_loss_radiator_kv():
 
 
 def test_calculate_pressure_loss_collector_kv():
-    length_circuit = 8
-    mass_flow_rate = 248
-    diameter = 14
-    pressure_loss_expected = 2057.07
+    length_circuit = 6
+    mass_flow_rate = 230
+    diameter = 20
+    pressure_loss_expected = 208 + 26
     pressure_loss_calculated = calculate_pressure_collector_kv(length_circuit, diameter,mass_flow_rate)
     assert pytest.approx(pressure_loss_expected, rel=1e-2) == pressure_loss_calculated
 
@@ -178,7 +178,7 @@ def test_merge_and_calculate_total_pressure_loss():
         'Collector': ['Collector 1', 'Collector 1', 'Collector 2'],
         'Pressure loss': [100.0, 150.0, 20.0],
         'Collector pressure loss': [220.689, 220.689, 2.484],
-        'Total Pressure Loss': [320.689, 370.689, 22.484]
+        'Total Pressure Loss': [320.689+2.484 +350, 370.689+2.484 + 350, 22.484 +350]
     }
     expected_df = pd.DataFrame(expected_data)
     result_df = merge_and_calculate_total_pressure_loss(radiator_df, collector_df)
