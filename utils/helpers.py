@@ -1,4 +1,6 @@
 import math
+from dataclasses import dataclass, field
+
 import numpy as np
 import pandas as pd
 
@@ -11,168 +13,207 @@ EXPONENT_RADIATOR = 1.34
 PRESSURE_LOSS_BOILER = 350
 
 
-def calculate_c(q_ratio: float, delta_t: float) -> float:
-    """Calculate the constant 'c' based on Q_ratio and delta_T."""
-    c = math.exp(delta_t / T_FACTOR / q_ratio ** (1 / EXPONENT_RADIATOR))
-    return c
+@dataclass
+class Radiator:
+    q_ratio: float
+    delta_t: float
+    space_temperature: float
+    heat_loss: float
+    return_temperature: float = field(init=False)
+    supply_temperature: float = field(init=False)
+    mass_flow_rate: float = field(init=False)
+
+    def __post_init__(self):
+        self.supply_temperature = self.calculate_tsupply()
+        self.return_temperature = self.calculate_treturn(self.supply_temperature)
+        self.mass_flow_rate = self.calculate_mass_flow_rate()
+
+    def calculate_c(self) -> float:
+        """Calculate the constant 'c' based on Q_ratio and delta_T."""
+        return math.exp(self.delta_t / T_FACTOR / self.q_ratio ** (1 / EXPONENT_RADIATOR))
+
+    def calculate_tsupply(self) -> float:
+        """Calculate the supply temperature based on space temperature, constant_c, and delta_T."""
+        constant_c = self.calculate_c()
+        return self.space_temperature + (constant_c / (constant_c - 1)) * self.delta_t
+
+    def calculate_treturn(self, max_supply_temperature) -> float:
+        """Calculate the return temperature."""
+        return (((self.q_ratio ** (1 / EXPONENT_RADIATOR) * T_FACTOR) ** 2) / (
+                    max_supply_temperature - self.space_temperature) +
+                self.space_temperature)
+
+    def calculate_mass_flow_rate(self) -> float:
+        """
+        Calculate the mass flow rate based on supply and return temperatures and heat loss.
+        """
+        return self.heat_loss / 4180 / (self.supply_temperature - self.return_temperature) * 3600
+
+    def calculate_diameter(self, possible_diameters: List[int]) -> float:
+        """Calculate the nearest acceptable pipe diameter based on the mass flow rate."""
+        if math.isnan(self.mass_flow_rate):
+            raise ValueError("The mass flow rate cannot be NaN. Check the configuration of the number of collectors.")
+        diameter = 1.4641 * self.mass_flow_rate ** 0.4217
+        acceptable_diameters = [d for d in possible_diameters if d >= diameter]
+
+        if not acceptable_diameters:
+            raise ValueError(
+                f"Calculated diameter exceeds the maximum allowable diameter for mass flow rate: {self.mass_flow_rate}")
+        return min(acceptable_diameters, key=lambda x: abs(x - diameter))
 
 
-def calculate_tsupply(space_temperature: float, constant_c: float, delta_t: float) -> float:
-    """Calculate the supply temperature based on space temperature, constant_c, and delta_T."""
-    return space_temperature + (constant_c / (constant_c - 1)) * delta_t
+@dataclass
+class Circuit:
+    length_circuit: float
+    diameter: float
+    mass_flow_rate: float
+
+    def calculate_pressure_loss_piping(self) -> float:
+        """Calculate the pressure loss for the piping."""
+        kv_piping = 51626 * (self.diameter / 1000) ** 2 - 417.39 * (self.diameter / 1000) + 1.5541
+        resistance_meter = 97180 * (self.mass_flow_rate / 1000 / kv_piping) ** 2
+        coefficient_local_losses = 1.3
+        return resistance_meter * self.length_circuit * coefficient_local_losses
+
+    def calculate_pressure_radiator_kv(self) -> float:
+        """Calculate the pressure loss for the radiator circuit."""
+        pressure_loss_piping = self.calculate_pressure_loss_piping()
+        kv_radiator = 2
+        pressure_loss_radiator = 97180 * (self.mass_flow_rate / 1000 / kv_radiator) ** 2
+        return pressure_loss_piping + pressure_loss_radiator
+
+    def calculate_water_volume(self) -> float:
+        """Calculate the water volume for the circuit."""
+        return (np.pi * (self.diameter / 2) ** 2) / 1000000 * self.length_circuit * 1000
+
+    def calculate_pressure_collector_kv(self) -> float:
+        """Using simplified functions for the kv of a component the pressure loss for the head circuit is calculated."""
+        pressure_loss_piping = self.calculate_pressure_loss_piping()
+        kv_collector = 14.66
+        pressure_loss_collector = 97180 * (self.mass_flow_rate / 1000 / kv_collector) ** 2
+        return pressure_loss_piping + pressure_loss_collector
 
 
-def calculate_treturn(q_ratio: float, space_temperature: float, max_supply_temperature: float) -> float:
-    return (((q_ratio ** (1 / EXPONENT_RADIATOR) * T_FACTOR) ** 2)/(max_supply_temperature - space_temperature) +
-            space_temperature)
+@dataclass
+class Collector:
+    name: str
+    pressure_loss: float = 0.0
+    mass_flow_rate: float = 0.0
+
+    def update_mass_flow_rate(self, radiator_df: pd.DataFrame) -> None:
+        """Update the mass flow rate for the collector based on radiator data."""
+        if self.name in radiator_df['Collector'].unique():
+            self.mass_flow_rate = radiator_df[radiator_df['Collector'] == self.name]['Mass flow rate'].sum()
+
+    def calculate_diameter(self, possible_diameters: List[int]) -> float:
+        """Calculate the nearest acceptable pipe diameter based on the updated mass flow rate."""
+        if math.isnan(self.mass_flow_rate):
+            raise ValueError("The mass flow rate cannot be NaN. Check the configuration of the number of collectors.")
+        diameter = 1.4641 * self.mass_flow_rate ** 0.4217
+        acceptable_diameters = [d for d in possible_diameters if d >= diameter]
+
+        if not acceptable_diameters:
+            raise ValueError(
+                f"Calculated diameter exceeds the maximum allowable diameter for mass flow rate: {self.mass_flow_rate}")
+        return min(acceptable_diameters, key=lambda x: abs(x - diameter))
+    def calculate_total_pressure_loss(self, radiator_df: pd.DataFrame, collector_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Merge radiator DataFrame with collector DataFrame on 'Collector' column and calculate total pressure loss.
+
+        For radiators connected to Collector 1, add pressure losses from all subsequent collectors (2, 3, etc.).
+        For radiators connected to Collector 2, add pressure losses from subsequent collectors (3, etc.).
+        For radiators connected to the last collector, only add the pressure loss of its own collector.
+        """
+        edited_collector_df = collector_df.sort_values('Collector')
+        merged_df = pd.merge(radiator_df, edited_collector_df[['Collector', 'Collector pressure loss']],
+                             on='Collector', how='left')
+        collector_pressure_loss_map = edited_collector_df.set_index('Collector')['Collector pressure loss'].to_dict()
+        collectors = list(collector_pressure_loss_map.keys())
+        total_pressure_losses = []
+        for idx, row in merged_df.iterrows():
+            current_collector_index = collectors.index(row['Collector'])
+            additional_pressure_loss = sum(
+                collector_pressure_loss_map[collectors[i]] for i in range(current_collector_index, len(collectors)))
+            total_pressure_loss = row['Pressure loss'] + additional_pressure_loss + PRESSURE_LOSS_BOILER
+            total_pressure_losses.append(total_pressure_loss)
+
+        merged_df['Total Pressure Loss'] = total_pressure_losses
 
 
-def calculate_mass_flow_rate(supply_temperature: float, return_temperature:float, heat_loss:float) -> float:
-    return heat_loss/4180/(supply_temperature-return_temperature)*3600
+        return merged_df
 
 
-def calculate_diameter(mass_flow_rate: float, possible_diameters: List[int]) -> float:
-    if math.isnan(mass_flow_rate):
-        raise ValueError("The mass flow rate cannot be NaN check the configuration of the number of collectors.")
-    diameter = 1.4641*mass_flow_rate**0.4217
-    acceptable_diameters = [d for d in possible_diameters if d >= diameter]
-    if not acceptable_diameters:
-        raise ValueError(f"Calculated diameter exceeds the maximum allowable diameter for mass flow rate:{mass_flow_rate}")
-    nearest_diameter = min(acceptable_diameters, key=lambda x: abs(x - diameter))
+@dataclass
+class Valve:
+    kv_max: float = 0.7  # Default kv_max value
+    n: int = 100  # Default number of valve positions
 
-    return nearest_diameter
+    def calculate_pressure_valve_kv(self, mass_flow_rate: float) -> float:
+        """
+        Calculate pressure loss for thermostatic valve at position N.
+        """
+        pressure_loss_valve = 97180 * (mass_flow_rate / 1000 / self.kv_max) ** 2
+        return pressure_loss_valve
 
+    def calculate_kv_needed(self, merged_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate the kv needed for each valve position based on pressure loss and mass flow rate.
+        """
+        merged_df = merged_df.copy()
+        merged_df['Total pressure valve circuit'] = merged_df['Total Pressure Loss'] + merged_df['Thermostatic valve pressure loss N']
+        maximum_pressure = max(merged_df['Total pressure valve circuit'])
+        merged_df['Pressure difference valve'] = maximum_pressure - merged_df['Total Pressure Loss']
+        merged_df['kv_needed'] = (merged_df['Mass flow rate'] / 1000) / (merged_df['Pressure difference valve'] / 100000) ** 0.5
+        return merged_df
 
-def merge_and_calculate_total_pressure_loss(edited_radiator_df: pd.DataFrame,
-                                            edited_collector_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Merge radiator DataFrame with collector DataFrame on 'Collector' column and calculate total pressure loss.
+    def calculate_valve_position(self, a: float, b: float, c: float, kv_needed: np.ndarray) -> np.ndarray:
+        """
+        Calculate the valve position based on kv needed and polynomial coefficients.
+        """
+        discriminant = b ** 2 - 4 * a * (c - kv_needed)
+        discriminant = np.where(discriminant < 0, 0, discriminant)
+        root = -b + np.sqrt(discriminant) / (2 * a)
+        root = np.where(discriminant <= 0, 0.1, root)
+        return root
 
-    For radiators connected to Collector 1, add pressure losses from all subsequent collectors (2, 3, etc.).
-    For radiators connected to Collector 2, add pressure losses from subsequent collectors (3, etc.).
-    For radiators connected to the last collector, only add the pressure loss of its own collector.
-    """
-    edited_collector_df = edited_collector_df.sort_values('Collector')
-    merged_df = pd.merge(edited_radiator_df, edited_collector_df[['Collector', 'Collector pressure loss']],
-                         on='Collector', how='left')
-    collector_pressure_loss_map = edited_collector_df.set_index('Collector')['Collector pressure loss'].to_dict()
-    collectors = list(collector_pressure_loss_map.keys())
-    total_pressure_losses = []
-    for idx, row in merged_df.iterrows():
-        current_collector_index = collectors.index(row['Collector'])
-        additional_pressure_loss = sum(
-            collector_pressure_loss_map[collectors[i]] for i in range(current_collector_index, len(collectors)))
-        total_pressure_loss = row['Pressure loss'] + additional_pressure_loss + PRESSURE_LOSS_BOILER
-        total_pressure_losses.append(total_pressure_loss)
+    def adjust_position_with_custom_values(self, kv_needed: np.ndarray) -> np.ndarray:
+        """
+        Adjust the valve position using custom kv_max and n values.
+        """
+        ratio_kv = kv_needed / 0.7054
+        adjusted_ratio_kv = (ratio_kv * self.kv_max) / self.kv_max
+        ratio_position = np.clip(np.sqrt(adjusted_ratio_kv), 0, 1)
+        adjusted_position = np.ceil(ratio_position * self.n)
+        return adjusted_position
 
-    merged_df['Total Pressure Loss'] = total_pressure_losses
+    def calculate_kv_position_valve(self, merged_df: pd.DataFrame, custom_kv_max: float = None, n: int = None) -> pd.DataFrame:
+        """
+        Calculate the valve positions and update the DataFrame with the results.
+        """
+        merged_df = self.calculate_kv_needed(merged_df)
+        a, b, c = 0.0114, -0.0086, 0.0446
+        initial_positions = self.calculate_valve_position(a, b, c, merged_df['kv_needed'].to_numpy())
 
-    return merged_df
+        if custom_kv_max is not None and n is not None:
+            self.kv_max = custom_kv_max
+            self.n = n
+            adjusted_positions = self.adjust_position_with_custom_values(merged_df['kv_needed'].to_numpy())
+            merged_df['Valve position'] = adjusted_positions.flatten()
+        else:
+            initial_positions = np.ceil(initial_positions)
+            merged_df['Valve position'] = initial_positions.flatten()
 
+        return merged_df
 
-def calculate_pressure_radiator_kv(length_circuit: float, diameter: float, mass_flow_rate: float) -> float:
-    """Using simplified functions for the kv of a component the pressure loss for the circuit is calculated. """
-    pressure_loss_piping = calculate_pressure_loss_piping(diameter, length_circuit, mass_flow_rate)
-    kv_radiator = 2
-    pressure_loss_radiator = 97180*(mass_flow_rate/1000/kv_radiator)**2
-    return pressure_loss_piping + pressure_loss_radiator
-
-
-def calculate_pressure_collector_kv(length_circuit: float, diameter: float, mass_flow_rate: float) -> float:
-    """Using simplified functions for the kv of a component the pressure loss for the head circuit is calculated. """
-    pressure_loss_piping = calculate_pressure_loss_piping(diameter, length_circuit, mass_flow_rate)
-    kv_collector = 14.14
-    pressure_loss_collector = 97180*(mass_flow_rate/1000/kv_collector)**2
-    return pressure_loss_piping + pressure_loss_collector
-
-
-def calculate_pressure_loss_piping(diameter: float, length_circuit: float, mass_flow_rate: float) -> float:
-    """Using simplified functions for the kv the pressure loss for the piping is calculated. """
-    # formula piping is specific for pex tubes we should make this an optional selection
-    kv_piping = 51626 * (diameter / 1000) ** 2 - 417.39 * (diameter / 1000) + 1.5541
-    resistance_meter = 97180 * (mass_flow_rate / 1000 / kv_piping) ** 2
-    coefficient_local_losses = 1.3
-    pressure_loss_piping = resistance_meter * length_circuit * coefficient_local_losses
-    return pressure_loss_piping
-
-
-def update_collector_mass_flow_rate(edited_radiator_df: pd.DataFrame, edited_collector_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate the total mass flow rate for each collector based on the radiator data,
-    and update the collector DataFrame with these values.
-    """
-    # Calculate total mass flow rate for each collector
-    collector_mass_flow_rate = (
-        edited_radiator_df.groupby('Collector')['Mass flow rate']
-        .sum().reset_index()
-    )
-
-    # Merge the mass flow rates into the collector DataFrame
-    updated_collector_df = pd.merge(edited_collector_df, collector_mass_flow_rate, on='Collector', how='left')
-    return updated_collector_df
-
-
-def calculate_pressure_valve_kv(mass_flow_rate: float) -> float:
-    """Calculate pressure loss for thermostatic valve at position N. """
-    kv_max_valve_n = 0.7
-    pressure_loss_valve = 97180*(mass_flow_rate/1000/kv_max_valve_n)**2
-    return pressure_loss_valve
-
-
-def calculate_kv_position_valve(merged_df, custom_kv_max=None, n=None):
-    merged_df = calculate_kv_needed(merged_df)
-    #kv formula polynomials fitted using data sheets
-    a = 0.0114
-    b = - 0.0086
-    c = 0.0446
-    initial_positions = calculate_valve_position(a, b, c, merged_df['kv_needed'])
-
-    if custom_kv_max is not None and n is not None:
-        kv_needed_array = merged_df['kv_needed'].to_numpy()
-        adjusted_positions = adjust_position_with_custom_values(custom_kv_max, n, kv_needed_array)
-        merged_df['Valve position'] = adjusted_positions.flatten()  # Ensure this is a single-dimensional array
-    else:
-        initial_positions = np.ceil(initial_positions)
-        merged_df['Valve position'] = initial_positions.flatten()  # Ensure this is a single-dimensional array
-
-    return merged_df
-
-
-def calculate_kv_needed(merged_df):
-    merged_df = merged_df.copy()
-    merged_df['Total pressure valve circuit'] = merged_df['Total Pressure Loss'] + merged_df[
-        'Thermostatic valve pressure loss N']
-    maximum_pressure = max(merged_df['Total pressure valve circuit'])
-    merged_df['Pressure difference valve'] = maximum_pressure - merged_df['Total Pressure Loss']
-    merged_df['kv_needed'] = (merged_df['Mass flow rate'] / 1000) / (
-                merged_df['Pressure difference valve'] / 100000) ** 0.5
-    return merged_df
-
-
-def calculate_valve_position(a, b, c, kv_needed):
-    discriminant = b ** 2 - 4 * a * (c - kv_needed)
-    discriminant = np.where(discriminant < 0, 0, discriminant)
-    root = -b + np.sqrt(discriminant) / (2 * a)
-    root = np.where(discriminant <= 0, 0.1, root)
-    return root
-
-
-def adjust_position_with_custom_values(kv_max, n, kv_needed):
-    ratio_kv = kv_needed / 0.7054
-    adjusted_ratio_kv = (ratio_kv * kv_max) / kv_max
-    ratio_position = np.clip(np.sqrt(adjusted_ratio_kv), 0,1)
-    adjusted_position = np.ceil(ratio_position * n)
-    return adjusted_position
-
-
-def calculate_position_valve_with_ratio(kv_max, n, kv_needed):
-    ratio_kv = kv_needed / kv_max
-    a = 0.8053
-    b = 0.1269
-    c = 0.0468
-    ratio_position = calculate_valve_position(a, b, c, ratio_kv)
-    final_position = np.ceil(ratio_position * n)
-    return final_position
+    def calculate_position_valve_with_ratio(self, kv_max: float, n: int, kv_needed: np.ndarray) -> np.ndarray:
+        """
+        Calculate the valve position based on a custom kv_max value and number of positions.
+        """
+        ratio_kv = kv_needed / kv_max
+        a, b, c = 0.8053, 0.1269, 0.0468
+        ratio_position = self.calculate_valve_position(a, b, c, ratio_kv)
+        final_position = np.ceil(ratio_position * n)
+        return final_position
 
 
 def validate_data(df: pd.DataFrame) -> bool:
@@ -183,9 +224,5 @@ def validate_data(df: pd.DataFrame) -> bool:
             return False
     return True
 
-
-def calculate_water_volume(diameter: float, length_circuit: float) -> float:
-    water_volume_pipe = (np.pi * (diameter/2)**2)/1000000 * length_circuit * 1000
-    return water_volume_pipe
 
 

@@ -4,10 +4,8 @@ from SALib.analyze import sobol
 import random
 from SALib.sample.saltelli import sample
 
-from utils.helpers import POSSIBLE_DIAMETERS, calculate_c, calculate_tsupply, calculate_treturn, calculate_mass_flow_rate, \
-    calculate_diameter, merge_and_calculate_total_pressure_loss, calculate_pressure_radiator_kv, \
-    calculate_pressure_collector_kv, calculate_pressure_valve_kv, update_collector_mass_flow_rate, \
-    calculate_kv_position_valve, validate_data
+from utils.helpers import POSSIBLE_DIAMETERS, validate_data
+from refactorclass import Radiator, Circuit, Collector, Valve
 
 num_samples = 1024
 param_ranges = {
@@ -62,62 +60,70 @@ for index, sample in param_values_df.iterrows():
     collector_data = pd.DataFrame(collector_initial_data)
 
     if validate_data(radiator_data):
-        radiator_data['Q_ratio'] = radiator_data['Calculated heat loss'] / radiator_data['Radiator power']
-        radiator_data['Constant_c'] = radiator_data.apply(lambda row: calculate_c(row['Q_ratio'], delta_T), axis=1)
-        radiator_data['Supply Temperature'] = radiator_data.apply(
-            lambda row: calculate_tsupply(row['Space Temperature'], row['Constant_c'], delta_T),
-            axis=1
-        )
+        radiators = []
+        for _, row in radiator_data.iterrows():
+            radiator = Radiator(
+                q_ratio=row['Calculated heat loss'] / row['Radiator power'],
+                delta_t=delta_T,
+                space_temperature=row['Space Temperature'],
+                heat_loss=row['Calculated heat loss']
+            )
+            radiators.append(radiator)
+        radiator_data['Supply Temperature'] = [r.supply_temperature for r in radiators]
+        max_supply_temperature = max(r.supply_temperature for r in radiators)
 
-        max_supply_temperature = radiator_data['Supply Temperature'].max()
-        radiator_data['Return Temperature'] = radiator_data.apply(
-            lambda row: calculate_treturn(row['Q_ratio'], row['Space Temperature'], max_supply_temperature),
-            axis=1
-        )
+        for r in radiators:
+            r.supply_temperature = max_supply_temperature
+            r.return_temperature = r.calculate_treturn(max_supply_temperature)
+            r.mass_flow_rate = r.calculate_mass_flow_rate()
         radiator_data['Supply Temperature'] = max_supply_temperature
-        radiator_data['Mass flow rate'] = radiator_data.apply(
-            lambda row: calculate_mass_flow_rate(row['Supply Temperature'], row['Return Temperature'],
-                                                 row['Calculated heat loss']),
-            axis=1
-        )
-
-        radiator_data['Diameter'] = radiator_data.apply(
-            lambda row: calculate_diameter(row['Mass flow rate'], POSSIBLE_DIAMETERS),
-            axis=1
-        )
+        radiator_data['Return Temperature'] = [r.return_temperature for r in radiators]
+        radiator_data['Mass flow rate'] = [r.mass_flow_rate for r in radiators]
+        radiator_data['Diameter'] = [
+            r.calculate_diameter(POSSIBLE_DIAMETERS) for r in radiators
+        ]
         radiator_data['Diameter'] = radiator_data['Diameter'].max()
-        radiator_data['Pressure loss'] = radiator_data.apply(
-            lambda row: calculate_pressure_radiator_kv(row['Length circuit'], row['Diameter'],
-                                                       row['Mass flow rate']),
-            axis=1
+        radiator_data['Pressure loss'] = [
+            Circuit(
+                length_circuit=row['Length circuit'],
+                diameter=row['Diameter'],
+                mass_flow_rate=row['Mass flow rate']
+            ).calculate_pressure_radiator_kv() for _, row in radiator_data.iterrows()
+        ]
+
+        collectors = [Collector(name=name) for name in collector_options]
+        for collector in collectors:
+            collector.update_mass_flow_rate(radiator_data)
+
+        collector_data_updated = collector_data.copy()
+        for collector in collectors:
+            collector_data_updated.loc[
+                collector_data_updated['Collector'] == collector.name, 'Mass flow rate'] = collector.mass_flow_rate
+
+        collector_data_updated['Diameter'] = [
+            collector.calculate_diameter(POSSIBLE_DIAMETERS) for collector in collectors
+        ]
+        collector_data_updated['Diameter'] = collector_data_updated['Diameter'].max()
+
+        collector_data_updated['Collector pressure loss'] = [
+            Circuit(
+                length_circuit=row['Collector circuit length'],
+                diameter=row['Diameter'],
+                mass_flow_rate=row['Mass flow rate']
+            ).calculate_pressure_collector_kv() for _, row in collector_data_updated.iterrows()
+        ]
+
+        merged_df = Collector(name='').calculate_total_pressure_loss(
+            radiator_df=radiator_data,
+            collector_df=collector_data_updated
         )
 
-        collector_data = update_collector_mass_flow_rate(radiator_data, collector_data)
-        collector_data['Diameter'] = collector_data.apply(
-            lambda row: calculate_diameter(row['Mass flow rate'], POSSIBLE_DIAMETERS),
-            axis=1
-        )
-        collector_data['Diameter'] = collector_data['Diameter'].max()
-        collector_data['Collector pressure loss'] = collector_data.apply(
-            lambda row: calculate_pressure_collector_kv(
-                row['Collector circuit length'],
-                row['Diameter'],
-                row['Mass flow rate']
-            ),
-            axis=1
-        )
+        valve = Valve(kv_max=kv_max, n=positions)
+        merged_df['Thermostatic valve pressure loss N'] = merged_df['Mass flow rate'].apply(
+            valve.calculate_pressure_valve_kv)
 
-        merged_df = merge_and_calculate_total_pressure_loss(edited_radiator_df=radiator_data,
-                                                            edited_collector_df=collector_data)
+        merged_df = valve.calculate_kv_position_valve(merged_df, custom_kv_max=kv_max, n=positions)
 
-        merged_df['Thermostatic valve pressure loss N'] = merged_df.apply(
-            lambda row: calculate_pressure_valve_kv(
-                row['Mass flow rate']
-            ),
-            axis=1
-        )
-
-        merged_df = calculate_kv_position_valve(merged_df=merged_df, n=positions, custom_kv_max=kv_max)
         for index, row in merged_df.iterrows():
             results.append({
                 'Radiator nr': row['Radiator nr'],
