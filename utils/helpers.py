@@ -116,6 +116,7 @@ class Collector:
             raise ValueError(
                 f"Calculated diameter exceeds the maximum allowable diameter for mass flow rate: {self.mass_flow_rate}")
         return min(acceptable_diameters, key=lambda x: abs(x - diameter))
+
     def calculate_total_pressure_loss(self, radiator_df: pd.DataFrame, collector_df: pd.DataFrame) -> pd.DataFrame:
         """
         Merge radiator DataFrame with collector DataFrame on 'Collector' column and calculate total pressure loss.
@@ -138,8 +139,6 @@ class Collector:
             total_pressure_losses.append(total_pressure_loss)
 
         merged_df['Total Pressure Loss'] = total_pressure_losses
-
-
         return merged_df
 
 

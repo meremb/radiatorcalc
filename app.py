@@ -48,29 +48,29 @@ def main() -> None:
     edited_radiator_df: pd.DataFrame = st.data_editor(
         radiator_data,
         key='editable_table',
-        num_rows="dynamic",
+        hide_index=True,
         use_container_width=True,
         height=min(600, 50 + 35 * num_radiators),
         column_config={
             'Radiator nr': st.column_config.NumberColumn(
-                "Radiator nr", format="%d", width=100),
+                "Radiator", format="%d"),
             'Collector': st.column_config.SelectboxColumn(
-                "Collector", options=collector_options, width=150),
+                "Collector", options=collector_options),
             'Radiator power': st.column_config.NumberColumn(
-                "Radiator power (W)", format="%.2f", width=150),
+                "Radiator (W)", format="%.2f"),
             'Calculated heat loss': st.column_config.NumberColumn(
-                "Heat loss (W)", format="%.2f", width=150),
+                "Heat loss (W)", format="%.2f"),
             'Length circuit': st.column_config.NumberColumn(
-                "Circuit Length (m)", format="%.2f", width=150),
+                "Circuit length (m)", format="%.2f"),
             'Space Temperature': st.column_config.NumberColumn(
-                "Space Temperature (°C)", format="%.1f", width=150),
+                "T indoor(°C)", format="%.1f"),
         }
     )
 
     edited_collector_df: pd.DataFrame = st.data_editor(
         collector_data,
         key='collector_table',
-        num_rows="dynamic",
+        hide_index=True,
         use_container_width=True,
         height=min(600, 50 + 35 * num_collectors),
         column_config={
@@ -189,17 +189,19 @@ def main() -> None:
                 merged_df[['Radiator nr', 'Collector', 'Pressure loss', 'Total Pressure Loss',
                            'Thermostatic valve pressure loss N', 'kv_needed', 'Supply Temperature',
                            'Return Temperature', 'Mass flow rate', 'Diameter']],
-                use_container_width=True
+                use_container_width=True,
+                hide_index=True
             )
 
             st.write('**Individual Collector results**')
             st.dataframe(
                 collector_data_updated[['Collector', 'Collector pressure loss', 'Mass flow rate', 'Diameter']],
-                use_container_width=True
+                use_container_width=True,
+                hide_index=True
             )
 
             st.write('**Total Pressure Loss per Circuit**')
-            st.dataframe(total_pressure_loss_per_circuit, use_container_width=True)
+            st.dataframe(total_pressure_loss_per_circuit, use_container_width=True, hide_index=True)
 
             plot_pressure_loss(total_pressure_loss_per_circuit)
             plot_thermostatic_valve_position(merged_df)
