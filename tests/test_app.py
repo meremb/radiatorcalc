@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from refactorclass import Radiator, POSSIBLE_DIAMETERS, Circuit, Collector, Valve
+from utils.helpers import Radiator, POSSIBLE_DIAMETERS, Circuit, Collector, Valve
 
 import pandas as pd
 import math
@@ -183,21 +183,3 @@ def test_calculate_position_valve_with_ratio(sample_valve):
     final_positions = sample_valve.calculate_position_valve_with_ratio(kv_max=0.67, n=9, kv_needed=kv_needed)
     expected_positions = np.array([4, 9, 7])
     assert np.allclose(final_positions, expected_positions, rtol=1e-2)
-
-
-
-
-# Sample data for testing
-radiator_data = pd.DataFrame({
-    'Radiator nr': [1, 2, 3],
-    'Collector': ['Collector 1', 'Collector 1', 'Collector 2'],
-    'Radiator power': [1500, 1500, 1500],
-    'Calculated heat loss': [1000, 1000, 1000],
-    'Length circuit': [10, 5, 7],
-    'Space Temperature': [20, 20, 20]
-})
-
-collector_data = pd.DataFrame({
-    'Collector': ['Collector 1', 'Collector 2'],
-    'Collector circuit length': [5, 5],
-})
