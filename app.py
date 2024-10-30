@@ -16,6 +16,8 @@ def main() -> None:
     positions = st.sidebar.number_input('Number of positions for valve', min_value=1, value=8, step=1)
     kv_max = st.sidebar.number_input('kv max for the valve', min_value=0.50, value=0.70, step=0.01)
     delta_T = st.sidebar.slider('Delta T (°C)', min_value=3, max_value=20, value=5, step=1)
+    supply_temp_input = st.sidebar.number_input('Supply Temperature (°C)', value=None, format="%.1f",
+                                                help="Leave blank to use calculated value this is just optional. To achieve lower supply temperatures a radiator with a higher power might be needed")
 
     radiator_columns: List[str] = [
         'Radiator nr', 'Collector', 'Radiator power', 'Calculated heat loss',
@@ -108,7 +110,15 @@ def main() -> None:
                 radiators.append(radiator)
 
             edited_radiator_df['Supply Temperature'] = [r.supply_temperature for r in radiators]
-            max_supply_temperature = max(r.supply_temperature for r in radiators)
+            if supply_temp_input is not None:
+                max_supply_temperature = supply_temp_input
+                if max_supply_temperature < max(r.supply_temperature for r in radiators):
+                    st.error(
+                        "Error: The maximum supply temperature must be greater than the maximum radiator supply temperature. We need a larger radiator to achieve a lower supply temperature")
+                else:
+                    pass
+            else:
+                max_supply_temperature = max(r.supply_temperature for r in radiators)
 
             for r in radiators:
                 r.supply_temperature = max_supply_temperature

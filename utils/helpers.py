@@ -11,6 +11,7 @@ POSSIBLE_DIAMETERS = [8, 10, 12, 13, 14, 16, 20, 22, 28, 36]
 T_FACTOR = 49.83
 EXPONENT_RADIATOR = 1.34
 PRESSURE_LOSS_BOILER = 350
+AVAILABLE_RADIATOR_POWERS = [2000, 2500, 3000, 3500, 4000]
 
 
 @dataclass
@@ -20,7 +21,7 @@ class Radiator:
     space_temperature: float
     heat_loss: float
     return_temperature: float = field(init=False)
-    supply_temperature: float = field(init=False)
+    supply_temperature: float = field(default=None)
     mass_flow_rate: float = field(init=False)
 
     def __post_init__(self):
@@ -60,6 +61,9 @@ class Radiator:
             raise ValueError(
                 f"Calculated diameter exceeds the maximum allowable diameter for mass flow rate: {self.mass_flow_rate}")
         return min(acceptable_diameters, key=lambda x: abs(x - diameter))
+
+
+
 
 
 @dataclass
@@ -217,11 +221,33 @@ class Valve:
 
 def validate_data(df: pd.DataFrame) -> bool:
     """Validate the input data to ensure all required fields are correctly filled."""
-    required_columns = ['Radiator power', 'Length circuit', 'Space Temperature']
+    required_columns = ['Radiator power', 'Calculated heat loss', 'Length circuit', 'Space Temperature']
     for col in required_columns:
         if df[col].isnull().any() or (df[col] <= 0).any():
             return False
+    for index, row in df.iterrows():
+        radiator_power = row['Radiator power']
+        heat_loss = row['Calculated heat loss']
+        if radiator_power <= heat_loss:
+            best_power = suggest_best_radiator_power(heat_loss)  # Get the best suggested power
+            warn_radiator_power(radiator_power, heat_loss)  # Trigger warning
+            df.at[index, 'Radiator power'] = best_power  # Overwrite with best power
     return True
 
+def warn_radiator_power(radiator_power: float, heat_loss: float):
+    """Issue a warning if radiator power is lower than heat loss and suggest the best possible radiator power."""
+    best_radiator_power = suggest_best_radiator_power(heat_loss)
+    print(f"Warning: Radiator power ({radiator_power}) is lower than heat loss ({heat_loss}).")
+    print(f"Consider using a radiator with at least {best_radiator_power} power for optimal performance.")
+    return best_radiator_power
 
+
+def suggest_best_radiator_power(heat_loss:float) -> float:
+    """Suggest the best possible radiator power based on the supply temperature."""
+    radiator_needed = None
+    for value in sorted(AVAILABLE_RADIATOR_POWERS):
+        if value > heat_loss + 1000:
+            radiator_needed = value
+            break
+    return radiator_needed
 
