@@ -16,7 +16,6 @@ def main() -> None:
     positions = st.sidebar.number_input('Number of positions for valve', min_value=1, value=8, step=1)
     kv_max = st.sidebar.number_input('kv max for the valve', min_value=0.50, value=0.70, step=0.01)
     delta_T = st.sidebar.slider('Delta T (°C)', min_value=3, max_value=20, value=5, step=1)
-    supply_temp_input = st.sidebar.number_input('Supply Temperature (°C)', min_value=45.0, max_value=70.0, step=1.0, format="%.1f")
 
     radiator_columns: List[str] = [
         'Radiator nr', 'Collector', 'Radiator power', 'Calculated heat loss',
@@ -31,7 +30,7 @@ def main() -> None:
         'Radiator power': [0.0] * num_radiators,
         'Calculated heat loss': [0.0] * num_radiators,
         'Length circuit': [0.0] * num_radiators,
-        'Space Temperature': [20.0] * num_radiators,
+        'Space Temperature': [20.0] * num_radiators,  # Default space temperature
     }
 
     radiator_data: pd.DataFrame = pd.DataFrame(radiator_initial_data, columns=radiator_columns)
@@ -106,13 +105,10 @@ def main() -> None:
                     space_temperature=row['Space Temperature'],
                     heat_loss=row['Calculated heat loss']
                 )
-                if row['Radiator power'] < row['Calculated heat loss']:
-                    radiator.warn_radiator_power()
                 radiators.append(radiator)
 
             edited_radiator_df['Supply Temperature'] = [r.supply_temperature for r in radiators]
-            max_supply_temperature = supply_temp_input if supply_temp_input else max(
-                r.supply_temperature for r in radiators)
+            max_supply_temperature = max(r.supply_temperature for r in radiators)
 
             for r in radiators:
                 r.supply_temperature = max_supply_temperature
