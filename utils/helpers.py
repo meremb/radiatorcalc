@@ -234,7 +234,8 @@ def validate_data(df: pd.DataFrame) -> bool:
             df.at[index, 'Radiator power'] = best_power  # Overwrite with best power
     return True
 
-def warn_radiator_power(radiator_power: float, heat_loss: float):
+
+def warn_radiator_power(radiator_power: float, heat_loss: float) -> float:
     """Issue a warning if radiator power is lower than heat loss and suggest the best possible radiator power."""
     best_radiator_power = suggest_best_radiator_power(heat_loss)
     print(f"Warning: Radiator power ({radiator_power}) is lower than heat loss ({heat_loss}).")
@@ -242,7 +243,7 @@ def warn_radiator_power(radiator_power: float, heat_loss: float):
     return best_radiator_power
 
 
-def suggest_best_radiator_power(heat_loss:float) -> float:
+def suggest_best_radiator_power(heat_loss: float) -> float:
     """Suggest the best possible radiator power based on the supply temperature."""
     radiator_needed = None
     for value in sorted(AVAILABLE_RADIATOR_POWERS):
