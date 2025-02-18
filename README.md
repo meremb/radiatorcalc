@@ -1,37 +1,57 @@
+# Radiator Distribution Calculator
+
+This project is a Streamlit application that calculates and visualizes the performance of radiators in a heating system. It evaluates pressure losses, supply and return temperatures, mass flow rates, and pipe diameters based on user inputs such as radiator power, calculated heat loss, circuit length, and space temperature. 
+
+The tool also provides the option to manually set the supply temperature or calculate it automatically to optimize radiator performance and energy efficiency.
 
 ---
-
-# Radiator Performance Analysis
-
-This project is a Streamlit application that calculates and visualizes the performance of radiators based on user inputs such as heat loss, power, space temperature, and circuit length. The app also includes a method to calculate the optimal valve position for a specific thermostatic valve.
 
 ## Project Structure
 
 ```
-your_project/
+radiatorcalc/
 ├── app.py                     # Main Streamlit application file
-├── main.py                    # (Optional) Entry point for the application
 ├── requirements.txt           # Python dependencies
 ├── README.md                  # Project documentation
-├── utils/                     # Utility modules
-│   ├── calculations.py        # Contains functions for radiator performance calculations
-│   ├── plotting.py            # Contains functions for generating plots and heatmaps
-│   └── valve_position.py      # Contains the function to calculate valve position
-└── data/                      # (Optional) Directory for storing data or configuration files
+└── utils/                     # Utility modules for calculations and plotting
+    ├── helpers.py             # Contains classes and helper functions for calculations
+    └── plotting.py            # Contains functions for generating plots
 ```
 
-### Key Modules
-- **`calculations.py`**: Contains functions to calculate various parameters such as constant `c`, supply and return temperatures, mass flow rate, pipe diameter, pressure loss, and required Kv value.
-  
-- **`plotting.py`**: Contains functions to generate line plots and heatmaps using Plotly.
+---
 
-- **`valve_position.py`**: Contains the `bereken_positie` function to calculate the optimal valve position based on Kv value, maximum Kv of the valve, and the number of valve positions.
+## Key Modules
+
+### `app.py`
+The main Streamlit application that:
+- Collects user inputs for radiators, collectors, and valve configurations.
+- Validates input data for correctness.
+- Calculates supply and return temperatures, mass flow rates, pipe diameters, and pressure losses.
+- Visualizes the results with interactive plots and heatmaps using Plotly.
+- Displays warnings and suggestions if the supply temperature is too low for the selected radiators.
+
+### `utils/helpers.py`
+Contains the following classes and methods:
+- `Radiator`: Calculates supply and return temperatures, mass flow rate, pipe diameter, and pressure loss for each radiator.
+- `Circuit`: Computes pressure loss and water volume in each heating circuit.
+- `Collector`: Aggregates mass flow rate and calculates pressure losses for collectors.
+- `Valve`: Determines thermostatic valve positions and calculates pressure losses across the valve.
+- `validate_data()`: Checks input data for completeness and correctness.
+
+### `utils/plotting.py`
+- Utilizes Plotly to create the following visualizations:
+  - Pressure loss per circuit
+  - Thermostatic valve positions
+  - Mass flow distribution
+  - Temperature heatmap
+
+---
 
 ## How to Use
 
 ### Prerequisites
 
-Ensure you have Python installed, and install the required dependencies using:
+Ensure you have Python installed. Install the required dependencies using:
 
 ```bash
 pip install -r requirements.txt
@@ -39,7 +59,7 @@ pip install -r requirements.txt
 
 ### Running the Application
 
-To start the Streamlit application, run the following command:
+Start the Streamlit application with:
 
 ```bash
 streamlit run app.py
@@ -47,54 +67,80 @@ streamlit run app.py
 
 This will launch the application in your default web browser.
 
-### Project Overview
+---
 
-1. **Inputs**: The application takes various user inputs such as heat loss, power, space temperature, circuit length, and others to compute radiator performance metrics.
+## Features
 
-2. **Calculations**: The calculations for the radiator's performance include determining the supply and return temperatures, mass flow rate, diameter of the pipes, and pressure loss.
+1. **User Inputs**: Collects inputs for:
+   - Number of radiators and collectors
+   - Radiator power and calculated heat loss
+   - Circuit lengths and space temperatures
+   - Valve positions and maximum Kv values
+   - Optional supply temperature for boundary conditions
 
-3. **Valve Position Calculation**: Based on the calculated Kv value and user-provided maximum Kv and number of valve positions, the optimal valve position is computed using the formula:
-   ```python
-   def bereken_positie(Kv_nodig, Kv_max, n):
-       r_Kv_nodig = Kv_nodig / Kv_max
-       r_p = math.sqrt(r_Kv_nodig)
-       return math.ceil(r_p * n)
-   ```
+2. **Calculations**:
+   - Supply and return temperatures
+   - Mass flow rates and pipe diameters
+   - Pressure losses across radiators, circuits, and collectors
+   - Thermostatic valve positions
 
-4. **Visualization**: The application generates interactive plots and heatmaps to visualize the calculated data.
+3. **Visualization**:
+   - Interactive Plotly charts to display pressure losses, valve positions, mass flow distribution, and temperature heatmaps.
+
+4. **Error Handling**:
+   - Input validation to catch and display errors.
+   - Suggestions for adjustments if supply temperature constraints are not met.
+
+---
 
 ## Example Usage
 
-Here's an example of how to use the `process_radiator` function in `app.py`:
+Here's an example of how a `Radiator` object is created and used for calculations:
 
 ```python
-power = 1000
-heat_loss = 800
-length_circuit = 20
-space_temperature = 20
-delta_T = 10
-Kv_max = 1.5
-n = 5
+from utils.helpers import Radiator
 
-radiator_data = process_radiator(power, heat_loss, length_circuit, space_temperature, delta_T, Kv_max, n)
+radiator = Radiator(
+    q_ratio=0.8, 
+    delta_t=5, 
+    space_temperature=20, 
+    heat_loss=800
+)
+
+supply_temp = radiator.supply_temperature
+return_temp = radiator.calculate_treturn(supply_temp)
+mass_flow_rate = radiator.calculate_mass_flow_rate()
+diameter = radiator.calculate_diameter([10, 12, 15, 18, 22])
 ```
 
-### Customization
+---
 
-You can modify the functions in the `utils/` directory to adjust the calculations or visualizations to suit your specific needs.
+## Customization
+
+- Modify classes in `utils/helpers.py` to adjust calculation methods.
+- Adjust visualizations in `utils/plotting.py` for different styles or additional plots.
+
+---
 
 ## Testing
 
-You can add unit tests for the functions in the `utils/` directory under a `tests/` directory. Use `pytest` for running the tests.
+To test the application:
+- Add unit tests in a `tests/` directory using `pytest`.
+- Run tests with:
+
+```bash
+pytest tests/
+```
+
+---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request or open an Issue if you find a bug or have a feature request.
+Contributions are welcome! Feel free to submit a Pull Request or open an Issue for bugs or feature requests.
+
+---
 
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for more information.
 
----
-
-This `README.md` provides an overview of the project, how to set it up, and how to use it. You can expand it further based on additional details or requirements specific to your project.
