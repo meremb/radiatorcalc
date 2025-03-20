@@ -24,8 +24,8 @@ def main() -> None:
                                                      "power might be needed")
 
     radiator_columns: List[str] = [
-        'Radiator nr', 'Collector', 'Radiator power', 'Calculated heat loss',
-        'Length circuit', 'Space Temperature'
+        'Radiator nr', 'Collector', 'Radiator power 75/65/20', 'Calculated heat loss',
+        'Length circuit', 'Space Temperature', 'Extra power'
     ]
 
     collector_options = [f'Collector {i + 1}' for i in range(num_collectors)]
@@ -33,10 +33,11 @@ def main() -> None:
     radiator_initial_data: Dict[str, List] = {
         'Radiator nr': list(range(1, num_radiators + 1)),
         'Collector': [collector_options[0]] * num_radiators,
-        'Radiator power': [0.0] * num_radiators,
+        'Radiator power 75/65/20': [0.0] * num_radiators,
         'Calculated heat loss': [0.0] * num_radiators,
         'Length circuit': [0.0] * num_radiators,
         'Space Temperature': [20.0] * num_radiators,  # Default space temperature
+        'Extra power': [0.0] * num_radiators,
     }
 
     radiator_data: pd.DataFrame = pd.DataFrame(radiator_initial_data, columns=radiator_columns)
@@ -59,17 +60,19 @@ def main() -> None:
         height=min(600, 50 + 35 * num_radiators),
         column_config={
             'Radiator nr': st.column_config.NumberColumn(
-                "Radiator", format="%d"),
+                "nr", format="%d"),
             'Collector': st.column_config.SelectboxColumn(
                 "Collector", options=collector_options),
-            'Radiator power': st.column_config.NumberColumn(
+            'Radiator power 75/65/20': st.column_config.NumberColumn(
                 "Radiator (W)", format="%.2f"),
             'Calculated heat loss': st.column_config.NumberColumn(
                 "Heat loss (W)", format="%.2f"),
             'Length circuit': st.column_config.NumberColumn(
                 "Circuit length (m)", format="%.2f"),
             'Space Temperature': st.column_config.NumberColumn(
-                "T indoor(°C)", format="%.1f"),
+                "Troom(°C)", format="%.1f"),
+            'Extra power': st.column_config.NumberColumn(
+                "Add Power", format="%.1f"),
         }
     )
 
@@ -89,7 +92,7 @@ def main() -> None:
     if st.button('Calculate Pressure Loss and Supply/Return Temperatures'):
         try:
             numeric_columns = [
-                'Radiator power', 'Calculated heat loss', 'Length circuit', 'Space Temperature'
+                'Radiator power 75/65/20', 'Calculated heat loss', 'Length circuit', 'Space Temperature'
             ]
             edited_radiator_df[numeric_columns] = edited_radiator_df[numeric_columns].apply(pd.to_numeric,
                                                                                             errors='coerce')
@@ -106,7 +109,7 @@ def main() -> None:
             radiators = []
             for _, row in edited_radiator_df.iterrows():
                 radiator = Radiator(
-                    q_ratio=row['Calculated heat loss'] / row['Radiator power'],
+                    q_ratio=(row['Calculated heat loss'] - row['Extra power']) / row['Radiator power 75/65/20'],
                     delta_t=delta_T,
                     space_temperature=row['Space Temperature'],
                     heat_loss=row['Calculated heat loss']
@@ -116,6 +119,7 @@ def main() -> None:
             edited_radiator_df['Supply Temperature'] = [r.supply_temperature for r in radiators]
             if supply_temp_input is not None:
                 max_supply_temperature = supply_temp_input
+                #todo calculate treturn and added power based on tsupply
                 if max_supply_temperature < max(r.supply_temperature for r in radiators):
                     st.error(
                         "Error: The maximum supply temperature must be greater than the maximum radiator supply"
@@ -174,7 +178,7 @@ def main() -> None:
             )
 
             valve = Valve(kv_max=kv_max, n=positions)
-            merged_df['Thermostatic valve pressure loss N'] = merged_df['Mass flow rate'].apply(
+            merged_df['Valve pressure loss N'] = merged_df['Mass flow rate'].apply(
                 valve.calculate_pressure_valve_kv)
             merged_df = valve.calculate_kv_position_valve(merged_df, custom_kv_max=kv_max, n=positions)
 
@@ -202,7 +206,7 @@ def main() -> None:
             st.write('**Individual Radiator Pressure Loss, Supply Temperature, and Return Temperature**')
             st.dataframe(
                 merged_df[['Radiator nr', 'Collector', 'Pressure loss', 'Total Pressure Loss',
-                           'Thermostatic valve pressure loss N', 'kv_needed', 'Supply Temperature',
+                           'Valve pressure loss N', 'kv_needed', 'Supply Temperature',
                            'Return Temperature', 'Mass flow rate', 'Diameter']],
                 use_container_width=True,
                 hide_index=True
