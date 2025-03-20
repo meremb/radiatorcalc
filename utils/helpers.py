@@ -36,19 +36,21 @@ class Radiator:
     def calculate_tsupply(self) -> float:
         """Calculate the supply temperature based on space temperature, constant_c, and delta_T."""
         constant_c = self.calculate_c()
-        return self.space_temperature + (constant_c / (constant_c - 1)) * self.delta_t
+        t_supply = self.space_temperature + (constant_c / (constant_c - 1)) * self.delta_t
+        return round(t_supply, 1)
 
     def calculate_treturn(self, max_supply_temperature) -> float:
         """Calculate the return temperature."""
-        return (((self.q_ratio ** (1 / EXPONENT_RADIATOR) * T_FACTOR) ** 2) / (
-                    max_supply_temperature - self.space_temperature) +
-                self.space_temperature)
+        t_return = (((self.q_ratio ** (1 / EXPONENT_RADIATOR) * T_FACTOR) ** 2) /
+                (max_supply_temperature - self.space_temperature) + self.space_temperature)
+        return round(t_return, 1)
 
     def calculate_mass_flow_rate(self) -> float:
         """
         Calculate the mass flow rate based on supply and return temperatures and heat loss.
         """
-        return self.heat_loss / 4180 / (self.supply_temperature - self.return_temperature) * 3600
+        mass_flow_rate = self.heat_loss / 4180 / (self.supply_temperature - self.return_temperature) * 3600
+        return round(mass_flow_rate, 1)
 
     def calculate_diameter(self, possible_diameters: List[int]) -> float:
         """Calculate the nearest acceptable pipe diameter based on the mass flow rate."""
@@ -77,25 +79,27 @@ class Circuit:
         kv_piping = 51626 * (self.diameter / 1000) ** 2 - 417.39 * (self.diameter / 1000) + 1.5541
         resistance_meter = 97180 * (self.mass_flow_rate / 1000 / kv_piping) ** 2
         coefficient_local_losses = 1.3
-        return resistance_meter * self.length_circuit * coefficient_local_losses
+        pressure_loss_pipe = resistance_meter * self.length_circuit * coefficient_local_losses
+        return round(pressure_loss_pipe, 1)
 
     def calculate_pressure_radiator_kv(self) -> float:
         """Calculate the pressure loss for the radiator circuit."""
         pressure_loss_piping = self.calculate_pressure_loss_piping()
         kv_radiator = 2
         pressure_loss_radiator = 97180 * (self.mass_flow_rate / 1000 / kv_radiator) ** 2
-        return pressure_loss_piping + pressure_loss_radiator
+        return round((pressure_loss_piping + pressure_loss_radiator), 1)
 
     def calculate_water_volume(self) -> float:
         """Calculate the water volume for the circuit."""
-        return (np.pi * (self.diameter / 2) ** 2) / 1000000 * self.length_circuit * 1000
+        water_volume = (np.pi * (self.diameter / 2) ** 2) / 1000000 * self.length_circuit * 1000
+        return round(water_volume, 2)
 
     def calculate_pressure_collector_kv(self) -> float:
         """Using simplified functions for the kv of a component the pressure loss for the head circuit is calculated."""
         pressure_loss_piping = self.calculate_pressure_loss_piping()
         kv_collector = 14.66
         pressure_loss_collector = 97180 * (self.mass_flow_rate / 1000 / kv_collector) ** 2
-        return pressure_loss_piping + pressure_loss_collector
+        return round((pressure_loss_piping + pressure_loss_collector), 1)
 
 
 @dataclass
@@ -156,14 +160,14 @@ class Valve:
         Calculate pressure loss for thermostatic valve at position N.
         """
         pressure_loss_valve = 97180 * (mass_flow_rate / 1000 / self.kv_max) ** 2
-        return pressure_loss_valve
+        return round(pressure_loss_valve, 1)
 
     def calculate_kv_needed(self, merged_df: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate the kv needed for each valve position based on pressure loss and mass flow rate.
         """
         merged_df = merged_df.copy()
-        merged_df['Total pressure valve circuit'] = merged_df['Total Pressure Loss'] + merged_df['Thermostatic valve pressure loss N']
+        merged_df['Total pressure valve circuit'] = merged_df['Total Pressure Loss'] + merged_df['Valve pressure loss N']
         maximum_pressure = max(merged_df['Total pressure valve circuit'])
         merged_df['Pressure difference valve'] = maximum_pressure - merged_df['Total Pressure Loss']
         merged_df['kv_needed'] = (merged_df['Mass flow rate'] / 1000) / (merged_df['Pressure difference valve'] / 100000) ** 0.5
@@ -243,9 +247,12 @@ def warn_radiator_power(radiator_power: float, heat_loss: float) -> float:
     return best_radiator_power
 
 
-def suggest_best_radiator_power(heat_loss: float) -> float:
+#todo add the supply temeprature as input and calculate than need power and add that to the column add power
+def suggest_best_radiator_power(heat_loss: float, supply_temperature: float, space_temperature: float) -> float:
     """Suggest the best possible radiator power based on the supply temperature."""
     radiator_needed = None
+    delta_t = supply_temperature - space_temperature
+
     for value in sorted(AVAILABLE_RADIATOR_POWERS):
         if value > heat_loss + 1000:
             radiator_needed = value
