@@ -64,7 +64,8 @@ def main() -> None:
             'Collector': st.column_config.SelectboxColumn(
                 "Collector", options=collector_options),
             'Radiator power 75/65/20': st.column_config.NumberColumn(
-                "Radiator (W)", format="%.2f"),
+                "Radiator 75/65/20"
+                "(W)", format="%.2f"),
             'Calculated heat loss': st.column_config.NumberColumn(
                 "Heat loss (W)", format="%.2f"),
             'Length circuit': st.column_config.NumberColumn(
