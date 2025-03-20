@@ -225,17 +225,17 @@ class Valve:
 
 def validate_data(df: pd.DataFrame) -> bool:
     """Validate the input data to ensure all required fields are correctly filled."""
-    required_columns = ['Radiator power', 'Calculated heat loss', 'Length circuit', 'Space Temperature']
+    required_columns = ['Radiator power 75/65/20', 'Calculated heat loss', 'Length circuit', 'Space Temperature']
     for col in required_columns:
         if df[col].isnull().any() or (df[col] <= 0).any():
             return False
     for index, row in df.iterrows():
-        radiator_power = row['Radiator power']
+        radiator_power = row['Radiator power 75/65/20']
         heat_loss = row['Calculated heat loss']
         if radiator_power <= heat_loss:
             best_power = suggest_best_radiator_power(heat_loss)  # Get the best suggested power
             warn_radiator_power(radiator_power, heat_loss)  # Trigger warning
-            df.at[index, 'Radiator power'] = best_power  # Overwrite with best power
+            df.at[index, 'Radiator power 75/65/20'] = best_power  # Overwrite with best power
     return True
 
 
@@ -259,3 +259,55 @@ def suggest_best_radiator_power(heat_loss: float, supply_temperature: float, spa
             break
     return radiator_needed
 
+
+def calculate_radiator_data(edited_radiator_df: pd.DataFrame, delta_T: float,
+                            supply_temp_input: float = None) -> pd.DataFrame:
+    """Method to perform the calculations and return the updated radiator DataFrame."""
+
+    # Validate data
+    numeric_columns = [
+        'Radiator power 75/65/20', 'Calculated heat loss', 'Length circuit', 'Space Temperature'
+    ]
+    edited_radiator_df[numeric_columns] = edited_radiator_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+    if not validate_data(edited_radiator_df):
+        raise ValueError("Invalid input data. Please check your inputs.")
+
+    # Initialize radiators for calculations
+    radiators = []
+    for _, row in edited_radiator_df.iterrows():
+        radiator = Radiator(
+            q_ratio=(row['Calculated heat loss'] - row['Extra power']) / row['Radiator power 75/65/20'],
+            delta_t=delta_T,
+            space_temperature=row['Space Temperature'],
+            heat_loss=row['Calculated heat loss']
+        )
+        radiators.append(radiator)
+
+    # Calculate supply temperature if not manually set
+    if supply_temp_input is not None:
+        max_supply_temperature = supply_temp_input
+        if max_supply_temperature < max(r.supply_temperature for r in radiators):
+            raise ValueError(
+                "Error: The maximum supply temperature must be greater than the maximum radiator supply temperature.")
+    else:
+        max_supply_temperature = max(r.supply_temperature for r in radiators)
+
+    # Perform calculations for supply temperature, return temperature, mass flow rate, etc.
+    for r in radiators:
+        r.supply_temperature = max_supply_temperature
+        r.return_temperature = r.calculate_treturn(max_supply_temperature)
+        r.mass_flow_rate = r.calculate_mass_flow_rate()
+
+    # Add calculated values to the DataFrame
+    edited_radiator_df['Supply Temperature'] = max_supply_temperature
+    edited_radiator_df['Return Temperature'] = [r.return_temperature for r in radiators]
+    edited_radiator_df['Mass flow rate'] = [r.mass_flow_rate for r in radiators]
+    edited_radiator_df['Diameter'] = [r.calculate_diameter(POSSIBLE_DIAMETERS) for r in radiators]
+    edited_radiator_df['Diameter'] = edited_radiator_df['Diameter'].max()
+    edited_radiator_df['Pressure loss'] = [
+        Circuit(length_circuit=row['Length circuit'], diameter=row['Diameter'], mass_flow_rate=row['Mass flow rate'])
+        .calculate_pressure_radiator_kv() for _, row in edited_radiator_df.iterrows()
+    ]
+
+    return edited_radiator_df
